@@ -7,17 +7,16 @@ kind: Template
 metadata:
   name: create-k8s-deployment
   title: Deploy to Kubernetes
-  description: Creates a Kubernetes Deployment, Service, and HPA for a containerised application and registers it in the catalog
+  description: Creates a Kubernetes Deployment, Service, and HPA — deployed automatically via ArgoCD
   tags:
     - kubernetes
     - eks
-    - deployment
+    - argocd
+    - gitops
     - infrastructure
 spec:
   owner: team-platform
   type: service
-
-  # ── Input form ──────────────────────────────────────────────────────────────
 
   parameters:
     - title: Application details
@@ -70,25 +69,21 @@ spec:
         replicas:
           title: Initial replicas
           type: integer
-          description: Number of pod replicas to start with
           default: 2
 
         min_replicas:
           title: Minimum replicas (HPA)
           type: integer
-          description: HPA will not scale below this
           default: 1
 
         max_replicas:
           title: Maximum replicas (HPA)
           type: integer
-          description: HPA will not scale above this
           default: 5
 
         cpu_threshold:
           title: CPU scale-up threshold (%)
           type: integer
-          description: HPA scales up when average CPU exceeds this percentage
           default: 70
 
     - title: Resources
@@ -96,25 +91,21 @@ spec:
         cpu_request:
           title: CPU request
           type: string
-          description: Guaranteed CPU e.g. 100m
           default: "100m"
 
         memory_request:
           title: Memory request
           type: string
-          description: Guaranteed memory e.g. 128Mi
           default: "128Mi"
 
         cpu_limit:
           title: CPU limit
           type: string
-          description: Maximum CPU e.g. 500m
           default: "500m"
 
         memory_limit:
           title: Memory limit
           type: string
-          description: Maximum memory e.g. 512Mi
           default: "512Mi"
 
     - title: Repository
@@ -125,8 +116,6 @@ spec:
           title: GitHub repository name
           type: string
           description: Name of the new repo that will hold the Kubernetes manifests
-
-  # ── Steps ───────────────────────────────────────────────────────────────────
 
   steps:
     - id: fetch-template
@@ -159,14 +148,42 @@ spec:
         defaultBranch: main
         repoVisibility: private
 
+    - id: argocd-create
+      name: Create ArgoCD Application
+      action: kubernetes:apply
+      input:
+        namespaced: true
+        clusterRef: eks-demo-cluster
+        manifest:
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: ${{ parameters.app_name }}
+            namespace: argocd
+            finalizers:
+              - resources-finalizer.argocd.argoproj.io
+          spec:
+            project: default
+            source:
+              repoURL: https://github.com/amonsum-stack/${{ parameters.repoName }}
+              targetRevision: main
+              path: .
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: ${{ parameters.namespace }}
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+                - CreateNamespace=false
+
     - id: register
       name: Register in catalog
       action: catalog:register
       input:
         repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
         catalogInfoPath: /catalog-info.yaml
-
-  # ── Output ──────────────────────────────────────────────────────────────────
 
   output:
     links:
