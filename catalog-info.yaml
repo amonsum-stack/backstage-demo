@@ -1,0 +1,175 @@
+# catalog-info.yaml
+# Place this file in the root of each service repository.
+# Backstage reads it to register the service in the catalog.
+#
+# This example models a weather API service running on the EKS cluster.
+
+---
+# ── System ────────────────────────────────────────────────────────────────────
+# A System groups related components together.
+# Think of it as the product or platform boundary.
+
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: weather-platform
+  description: Weather data ingestion and serving platform
+  tags:
+    - eks
+    - aws
+  annotations:
+    backstage.io/techdocs-ref: dir:.   # TechDocs built from docs/ in this repo
+spec:
+  owner: team-platform
+
+---
+# ── Component ─────────────────────────────────────────────────────────────────
+# A Component is a single deployable unit — a microservice, a frontend, a job.
+# This is what shows up in the Backstage catalog with live K8s state.
+
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: weather-api
+  description: REST API for serving weather forecasts
+  tags:
+    - nodejs
+    - rest
+    - postgres
+  annotations:
+    # GitHub repo — used by the scaffolder and for source links
+    github.com/project-slug: amonsum-stack/weather-api
+
+    # TechDocs — Backstage will serve docs from the docs/ folder in this repo
+    backstage.io/techdocs-ref: dir:.
+
+    # Kubernetes plugin — tells Backstage which K8s resources belong to this component.
+    # Backstage will look for pods/deployments with the label app=weather-api
+    backstage.io/kubernetes-label-selector: app=weather-api
+
+    # Kubernetes plugin — which cluster to look in (matches name in app-config.yaml)
+    backstage.io/kubernetes-id: weather-api
+
+  links:
+    - url: https://github.com/amonsum-stack/weather-api
+      title: GitHub Repository
+      icon: github
+    - url: http://localhost:7007/docs/default/component/weather-api
+      title: TechDocs
+      icon: docs
+
+spec:
+  type: service
+  lifecycle: production
+  owner: team-platform
+  system: weather-platform
+  providesApis:
+    - weather-api
+
+---
+# ── API ───────────────────────────────────────────────────────────────────────
+# Describes the API contract the Component exposes.
+# The spec.definition is an OpenAPI spec — Backstage renders it as interactive docs.
+
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: weather-api
+  description: Weather forecast REST API
+  tags:
+    - rest
+    - openapi
+spec:
+  type: openapi
+  lifecycle: production
+  owner: team-platform
+  system: weather-platform
+  definition: |
+    openapi: "3.0.0"
+    info:
+      title: Weather API
+      version: "1.0.0"
+      description: Returns weather forecasts by city
+    paths:
+      /health:
+        get:
+          summary: Health check
+          responses:
+            '200':
+              description: OK
+      /forecast/{city}:
+        get:
+          summary: Get weather forecast for a city
+          parameters:
+            - name: city
+              in: path
+              required: true
+              schema:
+                type: string
+          responses:
+            '200':
+              description: Forecast data
+              content:
+                application/json:
+                  schema:
+                    type: object
+                    properties:
+                      city:
+                        type: string
+                      temperature:
+                        type: number
+                      condition:
+                        type: string
+
+---
+# ── Resource ──────────────────────────────────────────────────────────────────
+# Models an infrastructure resource the component depends on.
+# This wires the RDS Postgres instance into the catalog so you can see
+# the dependency chain: weather-api → postgres-db
+
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: postgres-db
+  description: RDS PostgreSQL database for the weather platform
+  tags:
+    - aws
+    - rds
+    - postgres
+  annotations:
+    github.com/project-slug: amonsum-stack/backstage-demo
+spec:
+  type: database
+  owner: team-platform
+  system: weather-platform
+  dependencyOf:
+    - component:weather-api
+
+---
+# ── Group ─────────────────────────────────────────────────────────────────────
+# Models a team. Components, APIs, and Resources are owned by Groups.
+
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: team-platform
+  description: Platform engineering team
+spec:
+  type: team
+  profile:
+    displayName: Platform Team
+  children: []
+
+---
+# ── User ──────────────────────────────────────────────────────────────────────
+# Models a person. Link them to a Group so ownership chains resolve correctly.
+
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: igor
+spec:
+  profile:
+    displayName: Igor
+  memberOf:
+    - team-platform

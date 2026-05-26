@@ -1,0 +1,15 @@
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: ${{ values.bucket_name }}-${{ values.environment }}
+  description: S3 bucket ${{ values.environment }}-${{ values.bucket_name }} managed by Terraform
+  tags:
+    - aws
+    - s3
+    - ${{ values.environment }}
+  annotations:
+    github.com/project-slug: amonsum-stack/${{ values.repo_name }}
+spec:
+  type: storage
+  owner: ${{ values.owner }}
+  lifecycle: ${{ values.environment }}

@@ -31,7 +31,7 @@ spec:
 
       containers:
         - name: backstage
-          image: <YOUR_DOCKERHUB_OR_ECR>/backstage:latest  # built from your Backstage repo
+          image: igior/backstage:latest
           imagePullPolicy: Always
           ports:
             - name: http

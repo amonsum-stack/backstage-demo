@@ -1,0 +1,131 @@
+# template.yaml
+# Place this file in your backstage repo under:
+#   templates/create-s3-bucket/template.yaml
+#
+# This template lets a developer fill out a form in Backstage and get:
+#   1. A new GitHub repo with Terraform code for an S3 bucket
+#   2. A catalog-info.yaml registered in the Backstage catalog
+#   3. A GitHub Actions workflow that runs terraform apply on merge
+
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: create-s3-bucket
+  title: Create S3 Bucket
+  description: Provisions an AWS S3 bucket via Terraform and registers it in the catalog
+  tags:
+    - aws
+    - s3
+    - terraform
+    - infrastructure
+spec:
+  owner: team-platform
+  type: infrastructure
+
+  # ── Input form ──────────────────────────────────────────────────────────────
+  # These fields render as a form in the Backstage UI.
+  # The developer fills these in before hitting "Create".
+
+  parameters:
+    - title: Bucket details
+      required:
+        - bucket_name
+        - environment
+        - owner
+      properties:
+        bucket_name:
+          title: Bucket name suffix
+          type: string
+          description: Unique suffix for the bucket name (full name will be <env>-<suffix>-<account_id>)
+          pattern: '^[a-z0-9-]+$'
+          ui:autofocus: true
+
+        environment:
+          title: Environment
+          type: string
+          description: Deployment environment
+          enum:
+            - dev
+            - staging
+            - prod
+          default: dev
+
+        versioning:
+          title: Enable versioning
+          type: boolean
+          description: Enable S3 bucket versioning
+          default: false
+
+        lifecycle_days:
+          title: Object expiry (days)
+          type: integer
+          description: Delete objects after this many days (0 = never)
+          default: 0
+
+        owner:
+          title: Owner
+          type: string
+          description: Team or person responsible for this bucket
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+
+    - title: Repository details
+      required:
+        - repoName
+      properties:
+        repoName:
+          title: GitHub repository name
+          type: string
+          description: Name of the new repo that will hold the Terraform code
+          default: terraform-s3-${{ parameters.bucket_name }}
+
+  # ── Steps ───────────────────────────────────────────────────────────────────
+  # Each step runs in order. The scaffolder executes these server-side.
+
+  steps:
+    # Step 1 — render the Terraform files from the skeleton/ folder
+    - id: fetch-template
+      name: Fetch Terraform skeleton
+      action: fetch:template
+      input:
+        url: ./skeleton                      # folder next to this template.yaml
+        values:
+          bucket_name: ${{ parameters.bucket_name }}
+          environment: ${{ parameters.environment }}
+          versioning: ${{ parameters.versioning }}
+          lifecycle_days: ${{ parameters.lifecycle_days }}
+          owner: ${{ parameters.owner }}
+          repo_name: ${{ parameters.repoName }}
+
+    # Step 2 — create the GitHub repo and push the rendered files
+    - id: publish
+      name: Create GitHub repository
+      action: publish:github
+      input:
+        allowedHosts: ['github.com']
+        description: Terraform code for S3 bucket ${{ parameters.bucket_name }}
+        repoUrl: github.com?owner=<YOUR_ORG>&repo=${{ parameters.repoName }}
+        defaultBranch: main
+        repoVisibility: private
+
+    # Step 3 — register the new repo's catalog-info.yaml in Backstage
+    - id: register
+      name: Register in catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+  # ── Output ──────────────────────────────────────────────────────────────────
+  # Links shown to the developer after the template runs successfully.
+
+  output:
+    links:
+      - title: GitHub repository
+        url: ${{ steps.publish.output.remoteUrl }}
+        icon: github
+      - title: View in catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}
