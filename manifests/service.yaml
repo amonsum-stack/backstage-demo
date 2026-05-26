@@ -71,10 +71,20 @@ data:
       rules:
         - allow: [Component, API, System, Domain, Resource, Location, Template, User, Group]
       locations:
+        - type: file
+          target: ./examples/entities.yaml
+        - type: file
+          target: ./examples/template/template.yaml
+          rules:
+            - allow: [Template]
+        - type: file
+          target: ./examples/org.yaml
+          rules:
+            - allow: [User, Group]
         - type: url
-          target: https://github.com/<YOUR_ORG>/<YOUR_APP_REPO>/blob/main/catalog-info.yaml
+          target: https://github.com/amonsum-stack/backstage-demo/blob/main/catalog-info.yaml
         - type: url
-          target: https://github.com/<YOUR_ORG>/<YOUR_BACKSTAGE_REPO>/blob/main/templates/create-s3-bucket/template.yaml
+          target: https://github.com/amonsum-stack/backstage-demo/blob/main/templates/create-s3-bucket/template.yaml
           rules:
             - allow: [Template]
 

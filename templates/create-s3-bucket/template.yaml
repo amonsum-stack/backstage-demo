@@ -104,9 +104,8 @@ spec:
       name: Create GitHub repository
       action: publish:github
       input:
-        allowedHosts: ['github.com']
         description: Terraform code for S3 bucket ${{ parameters.bucket_name }}
-        repoUrl: github.com?owner=<YOUR_ORG>&repo=${{ parameters.repoName }}
+        repoUrl: github.com?owner=amonsum-stack&repo=${{ parameters.repoName }}
         defaultBranch: main
         repoVisibility: private
 

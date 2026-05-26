@@ -73,6 +73,16 @@ spec:
             - name: TECHDOCS_S3_BUCKET
               value: "your-techdocs-bucket-name"   # update after creating the bucket
 
+            - name: K8S_API_URL
+              value: <api-url>
+
+            - name: K8S_CA_DATA
+              value: "<ca-token>"
+
+            - name: K8S_SA_TOKEN
+              value: "<sa-token>"
+
+
             - name: NODE_ENV
               value: production
 
