@@ -79,7 +79,7 @@ spec:
           title: GitHub repository name
           type: string
           description: Name of the new repo that will hold the Terraform code
-          default: terraform-s3-${{ parameters.bucket_name }}
+          default: terraform-s3-bucket
 
   # ── Steps ───────────────────────────────────────────────────────────────────
   # Each step runs in order. The scaffolder executes these server-side.

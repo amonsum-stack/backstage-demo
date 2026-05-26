@@ -1,0 +1,20 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.app_name }}
+  description: ${{ values.app_name }} running on EKS in the ${{ values.namespace }} namespace
+  tags:
+    - kubernetes
+    - eks
+    - ${{ values.namespace }}
+  annotations:
+    github.com/project-slug: amonsum-stack/${{ values.repo_name }}
+
+    # Kubernetes plugin — matches pods with label app=<app_name>
+    backstage.io/kubernetes-label-selector: app=${{ values.app_name }}
+    backstage.io/kubernetes-id: ${{ values.app_name }}
+
+spec:
+  type: service
+  lifecycle: production
+  owner: ${{ values.owner }}

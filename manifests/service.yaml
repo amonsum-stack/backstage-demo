@@ -85,6 +85,8 @@ data:
           target: https://github.com/amonsum-stack/backstage-demo/blob/main/catalog-info.yaml
         - type: url
           target: https://github.com/amonsum-stack/backstage-demo/blob/main/templates/create-s3-bucket/template.yaml
+        - type: url
+          target: https://github.com/amonsum-stack/backstage-demo/blob/main/templates/create-k8s-deployment/template.yaml
           rules:
             - allow: [Template]
 

@@ -1,0 +1,38 @@
+name: Deploy to EKS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  id-token: write   # needed for OIDC auth to AWS
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::<YOUR_ACCOUNT_ID>:role/github-actions-eks
+          aws-region: us-east-1
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name eks-demo-cluster \
+            --region us-east-1
+
+      - name: Kubectl dry-run (PRs)
+        if: github.event_name == 'pull_request'
+        run: kubectl apply -f manifests.yaml --dry-run=server
+
+      - name: Kubectl apply (merge to main)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: kubectl apply -f manifests.yaml

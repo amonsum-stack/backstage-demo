@@ -1,0 +1,178 @@
+# template.yaml
+# Place this file in your backstage repo under:
+#   templates/create-k8s-deployment/template.yaml
+
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: create-k8s-deployment
+  title: Deploy to Kubernetes
+  description: Creates a Kubernetes Deployment, Service, and HPA for a containerised application and registers it in the catalog
+  tags:
+    - kubernetes
+    - eks
+    - deployment
+    - infrastructure
+spec:
+  owner: team-platform
+  type: service
+
+  # ── Input form ──────────────────────────────────────────────────────────────
+
+  parameters:
+    - title: Application details
+      required:
+        - app_name
+        - namespace
+        - image
+        - port
+        - owner
+      properties:
+        app_name:
+          title: Application name
+          type: string
+          description: Name of the application (used as the Deployment and Service name)
+          pattern: '^[a-z0-9-]+$'
+          ui:autofocus: true
+
+        namespace:
+          title: Kubernetes namespace
+          type: string
+          description: Namespace to deploy into (must already exist in the cluster)
+          default: default
+          enum:
+            - default
+            - weather
+            - backstage
+
+        image:
+          title: Container image
+          type: string
+          description: Full image reference e.g. igior/my-app:latest
+
+        port:
+          title: Container port
+          type: integer
+          description: Port the container listens on
+          default: 8080
+
+        owner:
+          title: Owner
+          type: string
+          description: Team or person responsible for this service
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+
+    - title: Scaling
+      properties:
+        replicas:
+          title: Initial replicas
+          type: integer
+          description: Number of pod replicas to start with
+          default: 2
+
+        min_replicas:
+          title: Minimum replicas (HPA)
+          type: integer
+          description: HPA will not scale below this
+          default: 1
+
+        max_replicas:
+          title: Maximum replicas (HPA)
+          type: integer
+          description: HPA will not scale above this
+          default: 5
+
+        cpu_threshold:
+          title: CPU scale-up threshold (%)
+          type: integer
+          description: HPA scales up when average CPU exceeds this percentage
+          default: 70
+
+    - title: Resources
+      properties:
+        cpu_request:
+          title: CPU request
+          type: string
+          description: Guaranteed CPU e.g. 100m
+          default: "100m"
+
+        memory_request:
+          title: Memory request
+          type: string
+          description: Guaranteed memory e.g. 128Mi
+          default: "128Mi"
+
+        cpu_limit:
+          title: CPU limit
+          type: string
+          description: Maximum CPU e.g. 500m
+          default: "500m"
+
+        memory_limit:
+          title: Memory limit
+          type: string
+          description: Maximum memory e.g. 512Mi
+          default: "512Mi"
+
+    - title: Repository
+      required:
+        - repoName
+      properties:
+        repoName:
+          title: GitHub repository name
+          type: string
+          description: Name of the new repo that will hold the Kubernetes manifests
+
+  # ── Steps ───────────────────────────────────────────────────────────────────
+
+  steps:
+    - id: fetch-template
+      name: Fetch Kubernetes skeleton
+      action: fetch:template
+      input:
+        url: ./skeleton
+        values:
+          app_name: ${{ parameters.app_name }}
+          namespace: ${{ parameters.namespace }}
+          image: ${{ parameters.image }}
+          port: ${{ parameters.port }}
+          replicas: ${{ parameters.replicas }}
+          min_replicas: ${{ parameters.min_replicas }}
+          max_replicas: ${{ parameters.max_replicas }}
+          cpu_threshold: ${{ parameters.cpu_threshold }}
+          cpu_request: ${{ parameters.cpu_request }}
+          memory_request: ${{ parameters.memory_request }}
+          cpu_limit: ${{ parameters.cpu_limit }}
+          memory_limit: ${{ parameters.memory_limit }}
+          owner: ${{ parameters.owner }}
+          repo_name: ${{ parameters.repoName }}
+
+    - id: publish
+      name: Create GitHub repository
+      action: publish:github
+      input:
+        description: Kubernetes manifests for ${{ parameters.app_name }}
+        repoUrl: github.com?owner=amonsum-stack&repo=${{ parameters.repoName }}
+        defaultBranch: main
+        repoVisibility: private
+
+    - id: register
+      name: Register in catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+  # ── Output ──────────────────────────────────────────────────────────────────
+
+  output:
+    links:
+      - title: GitHub repository
+        url: ${{ steps.publish.output.remoteUrl }}
+        icon: github
+      - title: View in catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}
