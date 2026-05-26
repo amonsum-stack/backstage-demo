@@ -1,0 +1,107 @@
+---
+# ServiceAccount — used exclusively by the Backstage Kubernetes plugin
+# to query cluster state. Lives in the backstage namespace.
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backstage-k8s-reader
+  namespace: backstage
+
+---
+# Long-lived token for the ServiceAccount.
+# Backstage's Kubernetes plugin requires a static token — it does not
+# support short-lived projected tokens yet.
+# The token value is auto-populated by Kubernetes and stored in this Secret.
+#
+# After applying, retrieve the token with:
+#   kubectl get secret backstage-k8s-reader-token \
+#     -n backstage \
+#     -o jsonpath='{.data.token}' | base64 -d
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backstage-k8s-reader-token
+  namespace: backstage
+  annotations:
+    kubernetes.io/service-account.name: backstage-k8s-reader
+type: kubernetes.io/service-account-token
+
+---
+# ClusterRole — read-only access to the resources the Kubernetes plugin
+# needs to display in the Backstage catalog.
+# No write permissions anywhere — this role cannot modify cluster state.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backstage-k8s-reader
+rules:
+  # Core workload resources
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - services
+      - endpoints
+      - namespaces
+      - nodes
+      - replicationcontrollers
+      - persistentvolumeclaims
+      - configmaps
+      - resourcequotas
+      - limitranges
+    verbs: ["get", "list", "watch"]
+
+  # Apps resources — Deployments, ReplicaSets, StatefulSets, DaemonSets
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - replicasets
+      - statefulsets
+      - daemonsets
+    verbs: ["get", "list", "watch"]
+
+  # Autoscaling — HPA
+  - apiGroups: ["autoscaling"]
+    resources:
+      - horizontalpodautoscalers
+    verbs: ["get", "list", "watch"]
+
+  # Batch — Jobs and CronJobs (shows your pg_dump backup CronJob in catalog)
+  - apiGroups: ["batch"]
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list", "watch"]
+
+  # Networking — Ingresses
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+    verbs: ["get", "list", "watch"]
+
+  # Metrics — needed for CPU/memory graphs in the plugin
+  - apiGroups: ["metrics.k8s.io"]
+    resources:
+      - pods
+      - nodes
+    verbs: ["get", "list"]
+
+---
+# ClusterRoleBinding — binds the ClusterRole to the ServiceAccount.
+# Cluster-scoped so the plugin can read resources across all namespaces.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backstage-k8s-reader
+subjects:
+  - kind: ServiceAccount
+    name: backstage-k8s-reader
+    namespace: backstage
+roleRef:
+  kind: ClusterRole
+  name: backstage-k8s-reader
+  apiGroup: rbac.authorization.k8s.io

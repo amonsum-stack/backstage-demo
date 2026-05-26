@@ -1,0 +1,119 @@
+---
+# ServiceAccount — annotated with the IRSA role ARN so the pod can
+# call Secrets Manager and S3 (TechDocs) without storing AWS credentials.
+# The role ARN is output by the Terraform backstage module (coming next).
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backstage
+  namespace: backstage
+  annotations:
+    eks.amazonaws.com/role-arn: ${BACKSTAGE_IRSA_ROLE_ARN}   # fill in after terraform apply
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backstage
+  namespace: backstage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backstage
+  template:
+    metadata:
+      labels:
+        app: backstage
+    spec:
+      serviceAccountName: backstage
+
+      containers:
+        - name: backstage
+          image: <YOUR_DOCKERHUB_OR_ECR>/backstage:latest  # built from your Backstage repo
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 7007
+
+          # All env vars — DB credentials come from ExternalSecret,
+          # everything else is set directly here for lab simplicity
+          env:
+            - name: BACKSTAGE_BASE_URL
+              value: "http://localhost:7007"
+
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-github-secret   # create manually: see note below
+                  key: GITHUB_TOKEN
+
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-postgres-secret
+                  key: POSTGRES_HOST
+            - name: POSTGRES_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-postgres-secret
+                  key: POSTGRES_PORT
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-postgres-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-postgres-secret
+                  key: POSTGRES_PASSWORD
+
+            - name: TECHDOCS_S3_BUCKET
+              value: "your-techdocs-bucket-name"   # update after creating the bucket
+
+            - name: NODE_ENV
+              value: production
+
+          # Mount app-config.yaml from a ConfigMap
+          volumeMounts:
+            - name: app-config
+              mountPath: /app/app-config.production.yaml
+              subPath: app-config.yaml
+              readOnly: true
+
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+
+          readinessProbe:
+            httpGet:
+              path: /healthcheck
+              port: 7007
+            initialDelaySeconds: 30
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /healthcheck
+              port: 7007
+            initialDelaySeconds: 60
+            periodSeconds: 30
+
+      volumes:
+        - name: app-config
+          configMap:
+            name: backstage-app-config
+
+# ── Note: GitHub token secret ─────────────────────────────────────────────────
+# Create this manually once per lab session (not managed by Terraform since
+# it contains a real secret you don't want in state):
+#
+#   kubectl create secret generic backstage-github-secret \
+#     --from-literal=GITHUB_TOKEN=ghp_xxxxxxxxxxxx \
+#     -n backstage

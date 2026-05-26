@@ -1,0 +1,106 @@
+---
+# ClusterIP Service — no external exposure needed, port-forward handles access.
+# kubectl port-forward svc/backstage 7007:7007 -n backstage
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: backstage
+  namespace: backstage
+spec:
+  selector:
+    app: backstage
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 7007
+      targetPort: 7007
+      protocol: TCP
+
+---
+# ConfigMap — holds app-config.yaml so it can be mounted into the pod.
+# Update this whenever you change app-config.yaml, then do:
+#   kubectl rollout restart deployment/backstage -n backstage
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-app-config
+  namespace: backstage
+data:
+  app-config.yaml: |
+    app:
+      title: My Developer Portal
+      baseUrl: http://localhost:7007
+
+    organization:
+      name: My Org
+
+    backend:
+      baseUrl: http://localhost:7007
+      listen:
+        port: 7007
+        host: 0.0.0.0
+      database:
+        client: pg
+        connection:
+          host: ${POSTGRES_HOST}
+          port: ${POSTGRES_PORT}
+          user: ${POSTGRES_USER}
+          password: ${POSTGRES_PASSWORD}
+          database: backstage_catalog
+          ssl:
+            rejectUnauthorized: false
+      reading:
+        allow:
+          - host: github.com
+          - host: raw.githubusercontent.com
+
+    integrations:
+      github:
+        - host: github.com
+          token: ${GITHUB_TOKEN}
+
+    auth:
+      environment: development
+      providers:
+        guest:
+          dangerouslyAllowOutsideDevelopment: true
+
+    catalog:
+      rules:
+        - allow: [Component, API, System, Domain, Resource, Location, Template, User, Group]
+      locations:
+        - type: url
+          target: https://github.com/<YOUR_ORG>/<YOUR_APP_REPO>/blob/main/catalog-info.yaml
+        - type: url
+          target: https://github.com/<YOUR_ORG>/<YOUR_BACKSTAGE_REPO>/blob/main/templates/create-s3-bucket/template.yaml
+          rules:
+            - allow: [Template]
+
+    techdocs:
+      builder: external
+      publisher:
+        type: awsS3
+        awsS3:
+          bucketName: ${TECHDOCS_S3_BUCKET}
+          region: us-east-1
+
+    kubernetes:
+      serviceLocatorMethod:
+        type: multiTenant
+      clusterLocatorMethods:
+        - type: config
+          clusters:
+            - name: eks-demo-cluster
+              url: ${K8S_API_URL}
+              authProvider: serviceAccount
+              skipTLSVerify: false
+              serviceAccountToken: ${K8S_SA_TOKEN}
+              caData: ${K8S_CA_DATA}
+
+    scaffolder:
+      defaultAuthor:
+        name: Backstage Scaffolder
+        email: scaffolder@example.com
+      defaultCommitMessage: "feat: scaffold from Backstage template"

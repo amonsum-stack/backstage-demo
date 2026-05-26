@@ -52,7 +52,7 @@ resource "aws_eks_addon" "vpc_cni" {
 
   depends_on = [module.eks]
 }
-
+/*
 resource "aws_eks_addon" "ebs_csi" {
   cluster_name = var.cluster_name
   addon_name   = "aws-ebs-csi-driver"
@@ -60,7 +60,7 @@ resource "aws_eks_addon" "ebs_csi" {
 
   depends_on = [module.eks]
 }
-
+*/
 module "rds" {
   source                 = "./modules/rds"
   private_subnet_id      = module.network.private_subnet_id
@@ -110,6 +110,24 @@ module "alb_controller" {
   depends_on = [module.oidc]
 }
 
+module "backstage_irsa" {
+  source = "./modules/backstage_irsa"
+
+  oidc_provider_arn    = module.oidc.oidc_provider_arn
+  oidc_provider_url    = module.oidc.oidc_provider_url
+  techdocs_bucket_name = module.s3_techdocs.techdocs_bucket_name
+
+  depends_on = [module.oidc]
+}
+
+module "s3_techdocs" {
+  source = "./modules/s3_techdocs"
+
+  cluster_name            = var.cluster_name
+  backstage_irsa_role_arn = module.backstage_irsa.backstage_irsa_role_arn
+}
+
+
 data "aws_ssm_parameter" "node_ami" {
   name = "/aws/service/eks/optimized-ami/1.35/amazon-linux-2023/x86_64/standard/recommended/image_id"
 }
@@ -132,5 +150,15 @@ output "backup_irsa_role_arn" {
 
 output "backup_bucket_name" {
   value = module.s3_backup.backup_bucket_name
+}
+
+output "backstage_irsa_role_arn" {
+  description = "Annotate the Backstage ServiceAccount with this ARN"
+  value       = module.backstage_irsa.backstage_irsa_role_arn
+}
+
+output "techdocs_bucket_name" {
+  description = "Set as TECHDOCS_S3_BUCKET env var in deployment.yaml"
+  value       = module.s3_techdocs.techdocs_bucket_name
 }
 
