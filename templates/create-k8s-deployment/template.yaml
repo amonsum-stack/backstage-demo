@@ -150,7 +150,19 @@ spec:
         defaultBranch: main
         repoVisibility: private
 
-    # Step 3 — Push the ArgoCD Application manifest into eks-gitops/apps/
+    # Step 3 — Render the ArgoCD Application manifest into a separate output folder
+    - id: fetch-argocd-app
+      name: Fetch ArgoCD app manifest
+      action: fetch:template
+      input:
+        url: ./argocd-skeleton
+        targetPath: ./argocd-output
+        values:
+          app_name: ${{ parameters.app_name }}
+          namespace: ${{ parameters.namespace }}
+          repo_name: ${{ parameters.repoName }}
+
+    # Step 4 — Push the rendered ArgoCD Application manifest into eks-gitops/apps/
     # The root ArgoCD app watches apps/ and will automatically create a child
     # Application for this service, which then syncs manifests.yaml to the cluster.
     - id: push-argocd-app
@@ -158,35 +170,11 @@ spec:
       action: github:repo:push
       input:
         repoUrl: github.com?owner=amonsum-stack&repo=eks-gitops
-        branch: main
-        commitMessage: "Add ArgoCD Application for ${{ parameters.app_name }}"
-        files:
-          - path: apps/${{ parameters.app_name }}.yaml
-            content: |
-              apiVersion: argoproj.io/v1alpha1
-              kind: Application
-              metadata:
-                name: ${{ parameters.app_name }}
-                namespace: argocd
-                finalizers:
-                  - resources-finalizer.argocd.argoproj.io
-              spec:
-                project: default
-                source:
-                  repoURL: https://github.com/amonsum-stack/${{ parameters.repoName }}
-                  targetRevision: main
-                  path: .
-                destination:
-                  server: https://kubernetes.default.svc
-                  namespace: ${{ parameters.namespace }}
-                syncPolicy:
-                  automated:
-                    prune: true
-                    selfHeal: true
-                  syncOptions:
-                    - CreateNamespace=false
+        defaultBranch: main
+        sourcePath: ./argocd-output
+        gitCommitMessage: "Add ArgoCD Application for ${{ parameters.app_name }}"
 
-    # Step 4 — Register the service in the Backstage catalog
+    # Step 5 — Register the service in the Backstage catalog
     - id: register
       name: Register in catalog
       action: catalog:register
