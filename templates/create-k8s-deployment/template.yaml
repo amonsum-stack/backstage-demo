@@ -118,6 +118,7 @@ spec:
           description: Name of the new repo that will hold the Kubernetes manifests
 
   steps:
+    # Step 1 — Render the skeleton files (manifests.yaml, catalog-info.yaml, deploy.yml)
     - id: fetch-template
       name: Fetch Kubernetes skeleton
       action: fetch:template
@@ -139,6 +140,7 @@ spec:
           owner: ${{ parameters.owner }}
           repo_name: ${{ parameters.repoName }}
 
+    # Step 2 — Create the service repo and push rendered manifests into it
     - id: publish
       name: Create GitHub repository
       action: publish:github
@@ -148,13 +150,18 @@ spec:
         defaultBranch: main
         repoVisibility: private
 
-    - id: argocd-create
-      name: Create ArgoCD Application
-      action: kubernetes:apply
+    # Step 3 — Push the ArgoCD Application manifest into eks-gitops/apps/
+    # The root ArgoCD app watches apps/ and will automatically create a child
+    # Application for this service, which then syncs manifests.yaml to the cluster.
+    - id: push-argocd-app
+      name: Register app in GitOps repo
+      action: publish:github:file
       input:
-        namespaced: true
-        clusterRef: eks-demo-cluster
-        manifest:
+        repoUrl: github.com?owner=amonsum-stack&repo=eks-gitops
+        branch: main
+        filePath: apps/${{ parameters.app_name }}.yaml
+        commitMessage: "Add ArgoCD Application for ${{ parameters.app_name }}"
+        fileContent: |
           apiVersion: argoproj.io/v1alpha1
           kind: Application
           metadata:
@@ -178,6 +185,7 @@ spec:
               syncOptions:
                 - CreateNamespace=false
 
+    # Step 4 — Register the service in the Backstage catalog
     - id: register
       name: Register in catalog
       action: catalog:register
