@@ -1,5 +1,5 @@
 name: Deploy to EKS
-
+# NOT NEEDED SINCE WE ARE USING ARGO-CD
 on:
   push:
     branches: [main]

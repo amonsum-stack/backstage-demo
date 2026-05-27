@@ -165,6 +165,7 @@ spec:
     # Step 4 — Push the rendered ArgoCD Application manifest into eks-gitops/apps/
     # The root ArgoCD app watches apps/ and will automatically create a child
     # Application for this service, which then syncs manifests.yaml to the cluster.
+    # Rember to merge the PR so that ArgoCD can pick it up
     - id: push-argocd-app
       name: Register app in GitOps repo
       action: publish:github:pull-request
