@@ -173,6 +173,7 @@ spec:
         defaultBranch: main
         sourcePath: ./argocd-output
         gitCommitMessage: "Add ArgoCD Application for ${{ parameters.app_name }}"
+        force: true
 
     # Step 5 — Register the service in the Backstage catalog
     - id: register
