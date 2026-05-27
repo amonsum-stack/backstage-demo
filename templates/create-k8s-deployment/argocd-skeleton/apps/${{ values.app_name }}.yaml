@@ -11,6 +11,8 @@ spec:
     repoURL: https://github.com/amonsum-stack/${{ values.repo_name }}
     targetRevision: main
     path: .
+    directory:
+      exclude: '{catalog-info.yaml,deploy.yml}'
   destination:
     server: https://kubernetes.default.svc
     namespace: ${{ values.namespace }}

@@ -1,8 +1,6 @@
 # Backstage on EKS
 
-A production-style internal developer portal built with [Backstage](https://backstage.io), deployed on AWS EKS, with full IaaC via Terraform and self-service infrastructure provisioning for developers.
-
-Built as a DevOps portfolio project demonstrating end-to-end platform engineering — from AWS infrastructure to developer experience.
+A production-style internal developer portal built with [Backstage](https://backstage.io), deployed on AWS EKS, with full IaC via Terraform and self-service infrastructure provisioning for developers.
 
 ---
 
@@ -13,9 +11,8 @@ Built as a DevOps portfolio project demonstrating end-to-end platform engineerin
 | Container orchestration | AWS EKS, Kubernetes, CloudFormation ASG |
 | Infrastructure as Code | Terraform (modular), AWS provider |
 | Developer portal | Backstage, Software Catalog, TechDocs, Software Templates |
-| GitOps | GitHub Actions, Terraform remote state |
+| GitOps | ArgoCD App of Apps, automated sync |
 | Security | IRSA, OIDC, AWS Secrets Manager, no static credentials |
-| Observability | CloudWatch alarms, SNS notifications |
 | Storage | RDS PostgreSQL, S3 (backups + TechDocs) |
 | Networking | VPC, public/private subnets, NAT, ALB Controller |
 
@@ -27,25 +24,27 @@ Built as a DevOps portfolio project demonstrating end-to-end platform engineerin
 Developer
     │
     ▼
-Backstage Portal (port-forward)
+Backstage Portal
     │
     ├── Software Catalog ──── catalog-info.yaml in each repo
-    ├── TechDocs ──────────── S3 bucket (pre-built in CI)
+    ├── TechDocs ──────────── S3 bucket
     ├── Kubernetes plugin ──── read-only ClusterRole → EKS
-    └── Software Templates ─── GitHub → Terraform → AWS
+    └── Software Templates
             │
-            ▼
-    EKS Cluster (us-east-1)
-            │
-            ├── Backstage Pod (IRSA → Secrets Manager, S3)
-            ├── AWS Load Balancer Controller (IRSA)
-            ├── External Secrets Operator
-            └── worker nodes (t3.medium, ASG 1-4)
-                    │
-                    ▼
-            RDS PostgreSQL (private subnet)
-            S3 backup bucket (weekly pg_dump)
-            S3 TechDocs bucket
+            ├── Create S3 Bucket ──── GitHub repo → Terraform → AWS
+            └── Deploy to Kubernetes
+                        │
+                        ├── Creates service repo (manifests.yaml)
+                        └── Opens PR to eks-gitops/apps/
+                                    │
+                                    ▼
+                            ArgoCD root-app (watches apps/)
+                                    │
+                                    ▼
+                            Child ArgoCD Application
+                                    │
+                                    ▼
+                            Kubernetes Deployment + Service + HPA
 ```
 
 ---
@@ -74,19 +73,29 @@ Backstage Portal (port-forward)
 │   ├── namespace.yaml
 │   ├── external-secret.yaml         # Pulls RDS creds from Secrets Manager
 │   ├── deployment.yaml              # Backstage Deployment + ServiceAccount
-│   ├── service.yaml                 # ClusterIP Service + ConfigMap
+│   ├── service.yaml                 # ClusterIP Service
+│   ├── argocd-rbac.yaml             # ArgoCD RBAC config
 │   ├── k8s-plugin-rbac.yaml         # Read-only ClusterRole for K8s plugin
 │   └── get-k8s-plugin-credentials.sh
 ├── templates/
-│   └── create-s3-bucket/            # Backstage Software Template
+│   ├── create-s3-bucket/            # Template: provision S3 via Terraform
+│   │   ├── template.yaml
+│   │   └── skeleton/
+│   │       ├── main.tf
+│   │       ├── catalog-info.yaml
+│   │       └── .github/workflows/terraform.yml
+│   └── create-k8s-deployment/       # Template: deploy app via ArgoCD
 │       ├── template.yaml
-│       └── skeleton/                # Rendered and pushed to GitHub on create
-│           ├── main.tf
-│           ├── catalog-info.yaml
-│           └── .github/workflows/terraform.yml
-├── catalog-info.yaml                # Weather API service catalog entry
-├── app-config.yaml                  # Backstage configuration
-└── docs/                            # TechDocs source
+│       ├── skeleton/                # Pushed to service repo on create
+│       │   ├── manifests.yaml       # Deployment, Service, HPA
+│       │   ├── catalog-info.yaml
+│       │   └── deploy.yml
+│       └── argocd-skeleton/         # Pushed to eks-gitops/apps/ via PR
+│           └── apps/
+│               └── ${{ values.app_name }}.yaml
+├── catalog-info.yaml
+├── app-config.yaml
+└── docs/
     ├── mkdocs.yml
     ├── index.md
     ├── architecture.md
@@ -127,8 +136,9 @@ terraform output node_instance_role_arn
 
 ```bash
 aws eks update-kubeconfig --name eks-demo-cluster --region us-east-1
-kubectl get nodes   # verify cluster is reachable
+kubectl get nodes
 ```
+Dont forget to modify and apply aws-auth-cm.yaml so the nodes get registered to the cluster
 
 ### 3. Install External Secrets Operator
 
@@ -138,52 +148,7 @@ helm install external-secrets external-secrets/external-secrets \
   -n external-secrets-operator --create-namespace
 ```
 
-### 4. Create the GitHub token secret
-
-```bash
-kubectl create secret generic backstage-github-secret \
-  --from-literal=GITHUB_TOKEN=ghp_xxxxxxxxxxxx \
-  -n backstage
-```
-
-### 5. Update deployment.yaml
-
-Fill in the IRSA role ARN from step 1:
-
-```yaml
-# manifests/deployment.yaml
-annotations:
-  eks.amazonaws.com/role-arn: <backstage_irsa_role_arn>
-```
-
-### 6. Get Kubernetes plugin credentials
-
-```bash
-kubectl apply -f manifests/k8s-plugin-rbac.yaml
-chmod +x manifests/get-k8s-plugin-credentials.sh
-./manifests/get-k8s-plugin-credentials.sh
-```
-
-Paste the three values (`K8S_API_URL`, `K8S_CA_DATA`, `K8S_SA_TOKEN`) into `manifests/deployment.yaml` as env vars.
-
-### 7. Deploy Backstage
-
-```bash
-kubectl apply -f manifests/namespace.yaml
-kubectl apply -f manifests/external-secret.yaml
-kubectl apply -f manifests/service.yaml
-kubectl apply -f manifests/deployment.yaml
-```
-
-Verify the pod is running:
-
-```bash
-kubectl get pods -n backstage
-kubectl logs -n backstage deployment/backstage
-```
-
-
-### install argo cd 
+### 4. Install ArgoCD
 
 ```bash
 kubectl create namespace argocd
@@ -194,7 +159,79 @@ helm install argocd argo/argo-cd \
   --set configs.params."server\.insecure"=true
 ```
 
-### 8. Access the portal
+### 5. Create the ArgoCD root Application
+
+This is the only ArgoCD resource you apply manually. All subsequent deployments
+are managed automatically through the GitOps repo.
+
+```bash
+kubectl apply -f - <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/amonsum-stack/eks-gitops
+    targetRevision: HEAD
+    path: apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+EOF
+```
+
+### 6. Create the GitHub token secret
+
+```bash
+kubectl create secret generic backstage-github-secret \
+  --from-literal=GITHUB_TOKEN=ghp_xxxxxxxxxxxx \
+  -n backstage
+```
+
+### 7. Update deployment.yaml
+
+Fill in the IRSA role ARN from step 1:
+
+```yaml
+annotations:
+  eks.amazonaws.com/role-arn: <backstage_irsa_role_arn>
+```
+
+### 8. Get Kubernetes plugin credentials
+
+```bash
+kubectl apply -f manifests/k8s-plugin-rbac.yaml
+chmod +x manifests/get-k8s-plugin-credentials.sh
+./manifests/get-k8s-plugin-credentials.sh
+```
+
+The script automatically populates `K8S_API_URL`, `K8S_CA_DATA`, and `K8S_SA_TOKEN`
+placeholders in `deployment.yaml`.
+
+### 9. Deploy Backstage
+
+```bash
+kubectl apply -f manifests/namespace.yaml
+kubectl apply -f manifests/external-secret.yaml
+kubectl apply -f manifests/service.yaml
+kubectl apply -f manifests/deployment.yaml
+```
+
+Verify:
+
+```bash
+kubectl get pods -n backstage
+kubectl logs -n backstage deployment/backstage
+```
+
+### 10. Access the portal
 
 ```bash
 kubectl port-forward svc/backstage 7007:7007 -n backstage
@@ -204,37 +241,35 @@ Open [http://localhost:7007](http://localhost:7007)
 
 ---
 
-## Self-service infrastructure (Software Templates)
+## Self-service templates
 
-Developers can provision AWS resources directly from the portal:
+### Deploy to Kubernetes
 
-1. Open Backstage → **Create** → **Create S3 Bucket**
-2. Fill in bucket name, environment, owner
+Deploys any containerised app to the EKS cluster via ArgoCD:
+
+1. Backstage → **Create** → **Deploy to Kubernetes**
+2. Fill in app name, namespace, image, port, scaling, and resource limits
 3. Hit **Create**
 
 The scaffolder will:
-- Render the Terraform skeleton with the provided values
-- Create a private GitHub repo
-- Push the Terraform code and a GitHub Actions workflow
+- Create a private GitHub repo with `manifests.yaml` (Deployment, Service, HPA)
+- Open a PR in `eks-gitops/apps/` with an ArgoCD Application manifest
+- Register the service in the Backstage catalog
+
+After merging the PR, ArgoCD automatically syncs the manifests to the cluster.
+
+### Create S3 Bucket
+
+Provisions an AWS S3 bucket via Terraform:
+
+1. Backstage → **Create** → **Create S3 Bucket**
+2. Fill in bucket name, environment, versioning, lifecycle policy
+3. Hit **Create**
+
+The scaffolder will:
+- Create a private GitHub repo with Terraform code
+- Push a GitHub Actions workflow that runs `terraform apply` on merge
 - Register the new resource in the Backstage catalog
-
-On merge to `main` the GitHub Actions workflow runs `terraform apply` and the bucket is created in AWS.
-
----
-
-## Rebuilding the Docker image
-
-If you modify the Backstage app:
-
-```bash
-cd my-backstage
-yarn install
-yarn tsc
-yarn build:all
-yarn build-image --tag igior/backstage:latest
-docker push igior/backstage:latest
-kubectl rollout restart deployment/backstage -n backstage
-```
 
 ---
 
@@ -244,7 +279,4 @@ kubectl rollout restart deployment/backstage -n backstage
 terraform destroy
 ```
 
-> Note: `force_destroy = true` is set on all S3 buckets so they empty and delete cleanly.
-
-
-### Cross plane should be implemented here for the deployment of resources from Backstage
+> `force_destroy = true` is set on all S3 buckets so they empty and delete cleanly.
