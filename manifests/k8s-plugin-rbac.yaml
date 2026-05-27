@@ -1,6 +1,5 @@
 ---
-# ServiceAccount — used exclusively by the Backstage Kubernetes plugin
-# to query cluster state. Lives in the backstage namespace.
+# ServiceAccount for the the Backstage Kubernetes plugin to query cluster state. 
 
 apiVersion: v1
 kind: ServiceAccount
@@ -29,8 +28,7 @@ metadata:
 type: kubernetes.io/service-account-token
 
 ---
-# ClusterRole — read-only access to the resources the Kubernetes plugin
-# needs to display in the Backstage catalog.
+# ClusterRole — read-only access to the resources the Kubernetes plugin needs to display in the Backstage catalog.
 # No write permissions anywhere — this role cannot modify cluster state.
 
 apiVersion: rbac.authorization.k8s.io/v1
@@ -38,7 +36,6 @@ kind: ClusterRole
 metadata:
   name: backstage-k8s-reader
 rules:
-  # Core workload resources
   - apiGroups: [""]
     resources:
       - pods
@@ -54,7 +51,6 @@ rules:
       - limitranges
     verbs: ["get", "list", "watch"]
 
-  # Apps resources — Deployments, ReplicaSets, StatefulSets, DaemonSets
   - apiGroups: ["apps"]
     resources:
       - deployments
@@ -63,26 +59,22 @@ rules:
       - daemonsets
     verbs: ["get", "list", "watch"]
 
-  # Autoscaling — HPA
   - apiGroups: ["autoscaling"]
     resources:
       - horizontalpodautoscalers
     verbs: ["get", "list", "watch"]
 
-  # Batch — Jobs and CronJobs (shows your pg_dump backup CronJob in catalog)
   - apiGroups: ["batch"]
     resources:
       - jobs
       - cronjobs
     verbs: ["get", "list", "watch"]
 
-  # Networking — Ingresses
   - apiGroups: ["networking.k8s.io"]
     resources:
       - ingresses
     verbs: ["get", "list", "watch"]
 
-  # Metrics — needed for CPU/memory graphs in the plugin
   - apiGroups: ["metrics.k8s.io"]
     resources:
       - pods

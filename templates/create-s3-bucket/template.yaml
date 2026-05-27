@@ -1,7 +1,3 @@
-# template.yaml
-# Place this file in your backstage repo under:
-#   templates/create-s3-bucket/template.yaml
-#
 # This template lets a developer fill out a form in Backstage and get:
 #   1. A new GitHub repo with Terraform code for an S3 bucket
 #   2. A catalog-info.yaml registered in the Backstage catalog
@@ -22,10 +18,8 @@ spec:
   owner: team-platform
   type: infrastructure
 
-  # ── Input form ──────────────────────────────────────────────────────────────
-  # These fields render as a form in the Backstage UI.
-  # The developer fills these in before hitting "Create".
-
+  #Input form 
+ 
   parameters:
     - title: Bucket details
       required:
@@ -81,16 +75,13 @@ spec:
           description: Name of the new repo that will hold the Terraform code
           default: terraform-s3-bucket
 
-  # ── Steps ───────────────────────────────────────────────────────────────────
-  # Each step runs in order. The scaffolder executes these server-side.
 
   steps:
-    # Step 1 — render the Terraform files from the skeleton/ folder
     - id: fetch-template
       name: Fetch Terraform skeleton
       action: fetch:template
       input:
-        url: ./skeleton                      # folder next to this template.yaml
+        url: ./skeleton                      
         values:
           bucket_name: ${{ parameters.bucket_name }}
           environment: ${{ parameters.environment }}
@@ -99,7 +90,6 @@ spec:
           owner: ${{ parameters.owner }}
           repo_name: ${{ parameters.repoName }}
 
-    # Step 2 — create the GitHub repo and push the rendered files
     - id: publish
       name: Create GitHub repository
       action: publish:github
@@ -109,7 +99,6 @@ spec:
         defaultBranch: main
         repoVisibility: private
 
-    # Step 3 — register the new repo's catalog-info.yaml in Backstage
     - id: register
       name: Register in catalog
       action: catalog:register
@@ -117,7 +106,6 @@ spec:
         repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
         catalogInfoPath: /catalog-info.yaml
 
-  # ── Output ──────────────────────────────────────────────────────────────────
   # Links shown to the developer after the template runs successfully.
 
   output:

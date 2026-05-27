@@ -12,6 +12,9 @@ set -e
 NAMESPACE="backstage"
 SECRET_NAME="backstage-k8s-reader-token"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
 echo ""
 echo "── K8s plugin credentials ───────────────────────────────────────"
 echo ""
@@ -41,3 +44,10 @@ echo ""
 echo "Or add them to a K8s Secret and reference via secretKeyRef,"
 echo "same pattern as the Postgres credentials."
 echo ""
+
+sleep 5
+
+sed -i "s|<api-url>|$API_URL|g" deployment.yaml
+sed -i "s|<ca-token>|$CA_DATA|g" deployment.yaml
+sed -i "s|<sa-token>|$TOKEN|g" deployment.yaml
+

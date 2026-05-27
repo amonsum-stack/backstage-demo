@@ -182,6 +182,18 @@ kubectl get pods -n backstage
 kubectl logs -n backstage deployment/backstage
 ```
 
+
+### install argo cd 
+
+```bash
+kubectl create namespace argocd
+helm repo add argo https://argoproj.github.io/argo-helm
+helm repo update
+helm install argocd argo/argo-cd \
+  --namespace argocd \
+  --set configs.params."server\.insecure"=true
+```
+
 ### 8. Access the portal
 
 ```bash
@@ -233,3 +245,6 @@ terraform destroy
 ```
 
 > Note: `force_destroy = true` is set on all S3 buckets so they empty and delete cleanly.
+
+
+### Cross plane should be implemented here for the deployment of resources from Backstage

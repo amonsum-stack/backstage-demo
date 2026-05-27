@@ -10,10 +10,8 @@ variable "techdocs_bucket_name" {
   description = "Name of the S3 bucket used for TechDocs"
 }
 
-# ── Trust policy ──────────────────────────────────────────────────────────────
-# Only the 'backstage' ServiceAccount in the 'backstage' namespace
-# on this specific cluster can assume this role.
-# This is the same pattern used in modules/alb_controller and modules/s3_backup.
+# Only the 'backstage' ServiceAccount in the 'backstage' namespace on this specific cluster can assume this role.
+# same pattern used in modules/alb_controller and modules/s3_backup.
 
 data "aws_iam_policy_document" "backstage_assume_role" {
   statement {
@@ -29,7 +27,6 @@ data "aws_iam_policy_document" "backstage_assume_role" {
       test     = "StringEquals"
       variable = "${var.oidc_provider_url}:sub"
       values   = ["system:serviceaccount:backstage:backstage"]
-      # format:   system:serviceaccount:<namespace>:<serviceaccount-name>
     }
 
     condition {
@@ -49,10 +46,8 @@ resource "aws_iam_role" "backstage_irsa" {
   }
 }
 
-# ── Permissions policy ────────────────────────────────────────────────────────
-# Scoped to exactly what Backstage needs:
-#   - Secrets Manager: read the postgres credentials secret
-#   - S3: read/list the TechDocs bucket so the frontend can serve docs
+# Permissions policy 
+# RDS-Postgres should be modified since its not used in here, but the secret manager is used.
 
 data "aws_caller_identity" "current" {}
 
@@ -72,7 +67,6 @@ resource "aws_iam_policy" "backstage_policy" {
           "secretsmanager:GetSecretValue",
           "secretsmanager:DescribeSecret"
         ]
-        # Scoped to only the postgres secret — not all secrets in the account
         Resource = "arn:aws:secretsmanager:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:secret:eks/postgres/credentials*"
       },
       {
@@ -95,10 +89,6 @@ resource "aws_iam_role_policy_attachment" "backstage_irsa_policy" {
   policy_arn = aws_iam_policy.backstage_policy.arn
   role       = aws_iam_role.backstage_irsa.name
 }
-
-# ── Output ────────────────────────────────────────────────────────────────────
-# Use this ARN to annotate the Backstage ServiceAccount in deployment.yaml:
-#   eks.amazonaws.com/role-arn: <this value>
 
 output "backstage_irsa_role_arn" {
   description = "IAM role ARN to annotate the Backstage ServiceAccount with"

@@ -9,7 +9,7 @@ metadata:
   name: backstage
   namespace: backstage
   annotations:
-    eks.amazonaws.com/role-arn: ${BACKSTAGE_IRSA_ROLE_ARN}   # fill in after terraform apply
+    eks.amazonaws.com/role-arn: <BACKSTAGE_IRSA_ROLE_ARN>   # fill in after terraform apply
 
 ---
 apiVersion: apps/v1

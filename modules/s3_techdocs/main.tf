@@ -8,11 +8,10 @@ variable "backstage_irsa_role_arn" {
 
 data "aws_caller_identity" "current" {}
 
-# ── S3 Bucket ─────────────────────────────────────────────────────────────────
 
 resource "aws_s3_bucket" "techdocs" {
   bucket        = "${var.cluster_name}-techdocs-${data.aws_caller_identity.current.account_id}"
-  force_destroy = true   # lab environment — allow clean terraform destroy
+  force_destroy = true   
 
   tags = {
     Name    = "eks-techdocs"
@@ -47,11 +46,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "techdocs" {
   }
 }
 
-# ── Bucket policy ─────────────────────────────────────────────────────────────
 # Only the Backstage IRSA role can read from this bucket.
-# The CI/CD pipeline that builds and uploads TechDocs will use its own
-# IAM credentials (e.g. a GitHub Actions OIDC role) — add that ARN
-# to the Principal list when you set up the pipeline.
 
 resource "aws_s3_bucket_policy" "techdocs" {
   bucket = aws_s3_bucket.techdocs.id
@@ -78,7 +73,6 @@ resource "aws_s3_bucket_policy" "techdocs" {
   })
 }
 
-# ── Outputs ───────────────────────────────────────────────────────────────────
 
 output "techdocs_bucket_name" {
   description = "S3 bucket name for TechDocs — use in TECHDOCS_S3_BUCKET env var and backstage_irsa module"

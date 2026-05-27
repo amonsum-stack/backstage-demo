@@ -1,6 +1,6 @@
 app:
   title: My Developer Portal
-  baseUrl: http://localhost:7007   # e.g. https://backstage.yourdomain.com
+  baseUrl: http://localhost:7007   # this should be a registered domain
 
 organization:
   name: My Org
@@ -22,16 +22,16 @@ backend:
   database:
     client: pg
     connection:
-      host: ${POSTGRES_HOST}         # injected from Secrets Manager via ExternalSecret
+      host: ${POSTGRES_HOST}         
       port: ${POSTGRES_PORT}
       user: ${POSTGRES_USER}
       password: ${POSTGRES_PASSWORD}
       database: backstage_catalog
       ssl:
-        rejectUnauthorized: false    # RDS uses self-signed cert; set to true + supply CA in production
+        rejectUnauthorized: false    
 
   cache:
-    store: memory                    # fine for a demo; swap to Redis for HA
+    store: memory                    
 
   # Reading catalog YAML files from GitHub requires the GitHub integration token
   reading:
@@ -39,26 +39,20 @@ backend:
       - host: github.com
       - host: raw.githubusercontent.com
 
-# ----------------------------------------------------------------------------
-# Integrations
-# ----------------------------------------------------------------------------
+
 integrations:
   github:
     - host: github.com
       token: ${GITHUB_TOKEN}         # GitHub PAT — read:repo + workflow scopes
 
-# ----------------------------------------------------------------------------
-# Auth — guest only (no login wall, good for CV demos)
-# ----------------------------------------------------------------------------
+
 auth:
   environment: development
   providers:
     guest:
       dangerouslyAllowOutsideDevelopment: true   # allows guest in a deployed env
 
-# ----------------------------------------------------------------------------
-# Catalog
-# ----------------------------------------------------------------------------
+
 catalog:
   import:
     entityFilename: catalog-info.yaml
@@ -69,13 +63,10 @@ catalog:
 
   locations:
     # ── Your own services / microservices ────────────────────────────────────
-    # Add a catalog-info.yaml to each repo and list it here, or use a wildcard
-    # discovery location (requires github-discovery plugin — see below).
     - type: url
       target: https://github.com/<YOUR_ORG>/<YOUR_APP_REPO>/blob/main/catalog-info.yaml
 
     # ── Software Templates (self-service IaaC) ───────────────────────────────
-    # Templates live in your backstage repo under templates/
     - type: url
       target: https://github.com/<YOUR_ORG>/<YOUR_BACKSTAGE_REPO>/blob/main/templates/create-s3-bucket/template.yaml
     - type: url
@@ -87,9 +78,7 @@ catalog:
       rules:
         - allow: [Template]
 
-# ----------------------------------------------------------------------------
-# TechDocs
-# ----------------------------------------------------------------------------
+
 techdocs:
   builder: external          # docs are pre-built in CI and uploaded to S3
   generator:
@@ -97,13 +86,10 @@ techdocs:
   publisher:
     type: awsS3
     awsS3:
-      bucketName: ${TECHDOCS_S3_BUCKET}    # a separate bucket from your backup bucket
+      bucketName: ${TECHDOCS_S3_BUCKET}    
       region: us-east-1
-      # credentials come from the pod's IRSA role — no keys needed
 
-# ----------------------------------------------------------------------------
-# Kubernetes plugin
-# ----------------------------------------------------------------------------
+---
 kubernetes:
   serviceLocatorMethod:
     type: multiTenant
@@ -118,18 +104,14 @@ kubernetes:
           serviceAccountToken: ${K8S_SA_TOKEN}   # token for a read-only ClusterRole
           caData: ${K8S_CA_DATA}           # base64 cluster CA from kubeconfig
 
-# ----------------------------------------------------------------------------
-# Scaffolder (Software Templates engine)
-# ----------------------------------------------------------------------------
+
 scaffolder:
   defaultAuthor:
     name: Backstage Scaffolder
     email: scaffolder@example.com
   defaultCommitMessage: "feat: scaffold from Backstage template"
 
-# ----------------------------------------------------------------------------
-# Proxy (optional — useful for exposing internal APIs via Backstage frontend)
-# ----------------------------------------------------------------------------
+
 proxy:
   '/argocd/api':
     target: ${ARGOCD_URL}/api/v1/
@@ -137,15 +119,11 @@ proxy:
     headers:
       Authorization: Bearer ${ARGOCD_TOKEN}
 
-# ----------------------------------------------------------------------------
-# Logging
-# ----------------------------------------------------------------------------
+
 backend:
   logger:
     level: info
     format: json                     # structured JSON for CloudWatch
 
-# ----------------------------------------------------------------------------
-# Feature flags
-# ----------------------------------------------------------------------------
+
 featureFlags: []
