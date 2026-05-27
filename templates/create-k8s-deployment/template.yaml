@@ -167,13 +167,14 @@ spec:
     # Application for this service, which then syncs manifests.yaml to the cluster.
     - id: push-argocd-app
       name: Register app in GitOps repo
-      action: github:repo:push
+      action: publish:github:pull-request
       input:
         repoUrl: github.com?owner=amonsum-stack&repo=eks-gitops
-        defaultBranch: main
+        branchName: add-${{ parameters.app_name }}
+        title: "Add ArgoCD Application for ${{ parameters.app_name }}"
+        description: "Automated PR from Backstage scaffolder — adds ArgoCD Application manifest for ${{ parameters.app_name }}"
         sourcePath: ./argocd-output
-        gitCommitMessage: "Add ArgoCD Application for ${{ parameters.app_name }}"
-        force: true
+        commitMessage: "Add ArgoCD Application for ${{ parameters.app_name }}"
 
     # Step 5 — Register the service in the Backstage catalog
     - id: register
