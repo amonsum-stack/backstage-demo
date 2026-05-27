@@ -155,35 +155,36 @@ spec:
     # Application for this service, which then syncs manifests.yaml to the cluster.
     - id: push-argocd-app
       name: Register app in GitOps repo
-      action: publish:github:file
+      action: github:repo:push
       input:
         repoUrl: github.com?owner=amonsum-stack&repo=eks-gitops
         branch: main
-        filePath: apps/${{ parameters.app_name }}.yaml
         commitMessage: "Add ArgoCD Application for ${{ parameters.app_name }}"
-        fileContent: |
-          apiVersion: argoproj.io/v1alpha1
-          kind: Application
-          metadata:
-            name: ${{ parameters.app_name }}
-            namespace: argocd
-            finalizers:
-              - resources-finalizer.argocd.argoproj.io
-          spec:
-            project: default
-            source:
-              repoURL: https://github.com/amonsum-stack/${{ parameters.repoName }}
-              targetRevision: main
-              path: .
-            destination:
-              server: https://kubernetes.default.svc
-              namespace: ${{ parameters.namespace }}
-            syncPolicy:
-              automated:
-                prune: true
-                selfHeal: true
-              syncOptions:
-                - CreateNamespace=false
+        files:
+          - path: apps/${{ parameters.app_name }}.yaml
+            content: |
+              apiVersion: argoproj.io/v1alpha1
+              kind: Application
+              metadata:
+                name: ${{ parameters.app_name }}
+                namespace: argocd
+                finalizers:
+                  - resources-finalizer.argocd.argoproj.io
+              spec:
+                project: default
+                source:
+                  repoURL: https://github.com/amonsum-stack/${{ parameters.repoName }}
+                  targetRevision: main
+                  path: .
+                destination:
+                  server: https://kubernetes.default.svc
+                  namespace: ${{ parameters.namespace }}
+                syncPolicy:
+                  automated:
+                    prune: true
+                    selfHeal: true
+                  syncOptions:
+                    - CreateNamespace=false
 
     # Step 4 — Register the service in the Backstage catalog
     - id: register
