@@ -38,19 +38,19 @@ spec:
               cpu: "${{ values.cpu_limit }}"
               memory: "${{ values.memory_limit }}"
 
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: ${{ values.port }}
-            initialDelaySeconds: 10
-            periodSeconds: 10
+#          readinessProbe:
+#            httpGet:
+#              path: /health
+#              port: ${{ values.port }}
+#            initialDelaySeconds: 10
+#            periodSeconds: 10
 
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: ${{ values.port }}
-            initialDelaySeconds: 30
-            periodSeconds: 30
+#          livenessProbe:
+#            httpGet:
+#              path: /health
+#              port: ${{ values.port }}
+#            initialDelaySeconds: 30
+#            periodSeconds: 30
 
 ---
 apiVersion: v1

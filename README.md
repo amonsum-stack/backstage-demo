@@ -195,6 +195,22 @@ kubectl create secret generic backstage-github-secret \
   -n backstage
 ```
 
+For Argocd to be automatically registered with your private repos, in the url place your name from github
+```bash
+kubectl create secret generic github-repo-creds \
+  --namespace argocd \
+  --from-literal=type=git \
+  --from-literal=url=https://github.com/amonsum-stack \
+  --from-literal=username=git \
+  --from-literal=password=ghp_xxxxxxxxxxxx \
+  --dry-run=client -o yaml | \
+  kubectl apply -f -
+
+kubectl label secret github-repo-creds \
+  -n argocd \
+  argocd.argoproj.io/secret-type=repo-creds
+```
+
 ### 7. Update deployment.yaml
 
 Fill in the IRSA role ARN from step 1:
