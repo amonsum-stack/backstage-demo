@@ -12,7 +12,8 @@ spec:
     targetRevision: main
     path: .
     directory:
-      exclude: 'catalog-info.yaml'
+      recurse: false
+      exclude: '{catalog-info.yaml,argocd-app.yaml}'
   destination:
     server: https://kubernetes.default.svc
     namespace: ${{ values.namespace }}

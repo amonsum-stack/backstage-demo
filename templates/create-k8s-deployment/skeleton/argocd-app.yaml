@@ -15,6 +15,8 @@ spec:
     repoURL: https://github.com/amonsum-stack/${{ values.repo_name }}
     targetRevision: main
     path: .   # manifests.yaml is in the repo root
+    directory:
+      exclude: '{catalog-info.yaml,argocd-app.yaml}'
 
   destination:
     server: https://kubernetes.default.svc   # in-cluster
